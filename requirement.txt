@@ -1,5 +1,3 @@
 gspread
 pandas
 oauth2client
-time
-hashlib
