@@ -3,6 +3,7 @@ import time
 import hashlib
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
+import os
 
 
 # CONFIGURATION
@@ -107,17 +108,26 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
 # AUTO MONITORING LOOP
 
 def main():
+
+    if os.getenv("GITHUB_ACTIONS"):
+        max_cycles = 3
+    else:
+        max_cycles = float("inf")
+    
     spreadsheet = connect_to_google_sheet()
+
     last_run_rows = {}
     print("\nMonitoring for new entries (real-time)...\n")
 
-    while True:
+    cycle = 0
+    while cycle < max_cycles:
         print("\nChecking for updates")
         for sheet_name, check_columns in SHEET_CONFIG.items():
             try:
                 sheet = spreadsheet.worksheet(sheet_name)
             except gspread.exceptions.WorksheetNotFound:
                 print(f"Skipping, {sheet_name} not found in the sheets")
+                continue
             except Exception as e:
                 print(f"Error while opening {sheet_name}: {e}")
 
@@ -138,11 +148,14 @@ def main():
             except Exception as e:
                 print(f"Unexpected error for {sheet_name}: {e}")
 
-            time.sleep(1)
+            time.sleep(10)
 
+        cycle += 1
         # Loop checks sheet every 5 seconds
         print("\nWaiting 3 seconds before the next batch checking...")
         time.sleep(3)
+
+    print("Finished all scheduled cycles")
 
 if __name__ == "__main__":
     main()
