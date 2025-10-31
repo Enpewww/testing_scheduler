@@ -51,7 +51,7 @@ def hash_sheet_data(values):
 # DUPLICATE CHECK FUNCTION
 
 def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
-    data_range = "A:Z"
+    data_range = "A:X"
     all_values = sheet.batch_get([data_range])[0]
 
     if len(all_values) < 2:
@@ -132,7 +132,7 @@ def main():
 
             try:
                 # Batch get configuration
-                data_range = "A:Z"
+                data_range = "A:X"
                 all_values = sheet.batch_get([data_range])[0]
                 current_row_count = len(all_values)
 
