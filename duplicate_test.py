@@ -4,7 +4,12 @@ import hashlib
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 import os
-
+from gspread_formatting import (
+    CellFormat, Color,
+    ConditionalFormatRule,
+    BooleanRule, BooleanCondition,
+    GridRange,
+)
 
 # CONFIGURATION
 
@@ -101,9 +106,75 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
     dup_col_index = df.columns.get_loc(duplicate_col_name) + 1
     dup_col_letter = gspread.utils.rowcol_to_a1(1, dup_col_index)[:-1]  # extract column letter
     update_range = f"{dup_col_letter}{start_row}:{dup_col_letter}{end_row}"
-
     sheet.update(update_range, [[v] for v in dup_values])
-    print(f"'{sheet.title}' updated ({df[duplicate_col_name].eq('Duplicate').sum()} duplicates).")
+
+    # Create color for the 'duplicate' and 'unique' column
+    duplicate_rule = ConditionalFormatRule(
+        ranges=[GridRange.from_a1_range(f"{dup_col_letter}2:{dup_col_letter}{len(df)+1}", sheet)],
+        booleanRule=BooleanRule(
+            condition=BooleanCondition('TEXT_EQ', ['Duplicate']),
+            format=CellFormat(
+                textFormat={'bold': True, 'foregroundColor': Color(1, 0, 0)}
+            )
+        )
+    )
+
+    unique_rule = ConditionalFormatRule(
+        ranges=[GridRange.from_a1_range(f"{dup_col_letter}2:{dup_col_letter}{len(df)+1}", sheet)],
+        booleanRule=BooleanRule(
+            condition=BooleanCondition('TEXT_EQ', ['Unique']),
+            format=CellFormat(
+                textFormat={'bold': True, 'foregroundColor': Color(0, 0.6, 0)}
+            )
+        )
+    )
+
+    request_body = {
+        'requests': [
+            {
+                'addConditionalFormatRule': {
+                    'rule': {
+                        'ranges': [duplicate_rule.ranges[0].__dict__],
+                        'booleanRule': {
+                            'condition': {
+                                'type': 'TEXT_EQ',
+                                'values': [{'userEnteredValue': 'Duplicate'}]
+                            },
+                            'format': {
+                                'textFormat': {
+                                    'bold': True,
+                                    'foregroundColor': {'red': 1, 'green': 0, 'blue': 0}
+                                }
+                            }
+                        }
+                    },
+                    'index': 0
+                }
+            },
+            {
+                'addConditionalFormatRule': {
+                    'rule': {
+                        'ranges': [unique_rule.ranges[0].__dict__],
+                        'booleanRule': {
+                            'condition': {
+                                'type': 'TEXT_EQ',
+                                'values': [{'userEnteredValue': 'Unique'}]
+                            },
+                            'format': {
+                                'textFormat': {
+                                    'bold': True,
+                                    'foregroundColor': {'red': 0, 'green': 0.6, 'blue': 0}
+                                }
+                            }
+                        }
+                    },
+                    'index': 1
+                }
+            }
+        ]
+    }
+
+    sheet.spreadsheet.batch_update(request_body)
 
 # AUTO MONITORING LOOP
 
