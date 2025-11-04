@@ -1,4 +1,4 @@
 gspread
 pandas
 oauth2client
-gspread_formatting
+gspread-formatting
