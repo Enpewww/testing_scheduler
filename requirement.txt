@@ -1,4 +1,8 @@
 gspread
+gspread-formatting
 pandas
 oauth2client
-gspread-formatting
+requests
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
