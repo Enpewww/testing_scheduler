@@ -14,7 +14,7 @@ from gspread_formatting import (
 # CONFIGURATION
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GiHAMx-K2APmNeMSq6TDgz3s8GdStWFHFYgbK9igFno/edit#gid=0"
-CREDENTIALS_FILE = "credentials.json"
+credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 DUPLICATE_COLUMN = "Duplicate Data Checker"
 
 SHEET_CONFIG = {
@@ -42,7 +42,7 @@ def connect_to_google_sheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
     client = gspread.authorize(creds)
     spreadsheet = client.open_by_url(SHEET_URL)
     print(f"Connected to: {spreadsheet.title}")
