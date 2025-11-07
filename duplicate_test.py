@@ -4,6 +4,7 @@ import hashlib
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 import os
+import json
 from gspread_formatting import (
     CellFormat, Color,
     ConditionalFormatRule,
@@ -15,6 +16,7 @@ from gspread_formatting import (
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GiHAMx-K2APmNeMSq6TDgz3s8GdStWFHFYgbK9igFno/edit#gid=0"
 credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+CREDENTIALS_FILE = "credentials.json"
 DUPLICATE_COLUMN = "Duplicate Data Checker"
 
 SHEET_CONFIG = {
@@ -67,6 +69,10 @@ def hash_sheet_data(values):
 # DUPLICATE CHECK FUNCTION
 
 def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
+    print(f"\n{'='*50}")
+    print(f"Processing sheet: {sheet.title}")
+    print(f"Looking for columns: {check_columns}")
+    
     data_range = "A:X"
     all_values = sheet.batch_get([data_range])[0]
 
@@ -76,6 +82,10 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
 
     headers = all_values[1]  # start from 2nd row as the column
     data_rows = all_values[2:] # start to get the value from 3rd row as the value
+    
+    print(f"Headers found in sheet:")
+    for i, header in enumerate(headers):
+        print(f"{i+1}. '{header}'")
 
     if not data_rows:
         print(f"'{sheet.title}' has no data rows, skipping.")
@@ -87,6 +97,17 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
 
     df = pd.DataFrame(data_rows, columns=headers)
     df.columns = df.columns.str.strip()
+    
+    # Handle duplicate column names
+    if duplicate_col_name in df.columns:
+        # Find all columns that match our duplicate column name
+        dup_cols = [i for i, col in enumerate(df.columns) if col == duplicate_col_name]
+        
+        if len(dup_cols) > 1:
+            print(f"Found multiple '{duplicate_col_name}' columns. Keeping the last one.")
+            # Keep only the last occurrence of the duplicate column
+            cols_to_drop = dup_cols[:-1]  # all but the last one
+            df = df.drop(df.columns[cols_to_drop], axis=1)
 
     df = df.dropna(how='all')
     df = df[~(df.apply(lambda x: x.astype(str).str.strip() == '').all(axis=1))]
@@ -105,20 +126,53 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
         df[duplicate_col_name] = ""
 
     # Clean and mark only non-empty rows
-    non_empty_mask = df[check_columns].apply(lambda x: x.str.strip().replace('', pd.NA)).notna().any(axis=1)
-    duplicates_mask = df.loc[non_empty_mask].duplicated(subset=check_columns, keep=False)
-    df.loc[non_empty_mask, duplicate_col_name] = duplicates_mask.map({True: "Duplicate", False: "Unique"})
-    df.loc[~non_empty_mask, duplicate_col_name] = ""
+    try:
+        print(f"Processing sheet with {len(df)} rows")
+        
+        # Reset index to make sure we have continuous integers
+        df = df.reset_index(drop=True)
+        
+        # Handle missing or empty values in check columns
+        for col in check_columns:
+            df[col] = df[col].fillna('').astype(str).str.strip()
+        
+        # Initialize duplicate column
+        df[duplicate_col_name] = ""
+        
+        # Create mask for rows where any check column has data
+        non_empty_mask = df[check_columns].apply(lambda x: x != '').any(axis=1)
+        non_empty_count = non_empty_mask.sum()
+        print(f"Found {non_empty_count} non-empty rows to process")
+        
+        if non_empty_count > 0:
+            # Create a temporary DataFrame with only non-empty rows
+            temp_df = df[non_empty_mask].copy()
+            
+            # Check for duplicates
+            duplicates = temp_df.duplicated(subset=check_columns, keep=False)
+            
+            # Map True/False to Duplicate/Unique
+            temp_df[duplicate_col_name] = duplicates.map({True: "Duplicate", False: "Unique"})
+            
+            # Copy results back to main DataFrame
+            df.loc[non_empty_mask, duplicate_col_name] = temp_df[duplicate_col_name]
+            
+            print(f"Marked {duplicates.sum()} duplicates")
+        
+    except Exception as e:
+        print(f"Error in duplicate marking: {str(e)}")
+        print(f"DataFrame info:")
+        print(df.info())
+        return
 
-    # Write only the Duplicate column back to sheet (duplicate)
-    dup_values = df[duplicate_col_name].fillna("").tolist()
+    # Write only the Duplicate column back to sheet
+    dup_values = df[duplicate_col_name].values.tolist()
     start_row = 3  # because header is at row 2
     end_row = start_row + len(dup_values) - 1
     dup_col_index = df.columns.get_loc(duplicate_col_name) + 1
     dup_col_letter = gspread.utils.rowcol_to_a1(1, dup_col_index)[:-1]  # extract column letter
     update_range = f"{dup_col_letter}{start_row}:{dup_col_letter}{end_row}"
-    sheet.update(update_range, [[v] for v in dup_values])
-    print(f"'{sheet.title}' updated ({df[duplicate_col_name].eq('Duplicate').sum()} duplicates).")
+    sheet.update(values=[[v] for v in dup_values], range_name=update_range)
 
     # Create color for the 'duplicate' and 'unique' column
     duplicate_rule = ConditionalFormatRule(
