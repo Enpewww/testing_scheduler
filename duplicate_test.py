@@ -14,7 +14,7 @@ from gspread_formatting import (
 # CONFIGURATION
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GiHAMx-K2APmNeMSq6TDgz3s8GdStWFHFYgbK9igFno/edit#gid=0"
-CREDENTIALS_FILE = "credentials.json"
+credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
 DUPLICATE_COLUMN = "Duplicate Data Checker"
 
 SHEET_CONFIG = {
@@ -110,7 +110,7 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
     df.loc[non_empty_mask, duplicate_col_name] = duplicates_mask.map({True: "Duplicate", False: "Unique"})
     df.loc[~non_empty_mask, duplicate_col_name] = ""
 
-    # Write only the Duplicate column back to sheet
+    # Write only the Duplicate column back to sheet (duplicate)
     dup_values = df[duplicate_col_name].fillna("").tolist()
     start_row = 3  # because header is at row 2
     end_row = start_row + len(dup_values) - 1
@@ -118,6 +118,7 @@ def mark_duplicates_for_sheet(sheet, duplicate_col_name, check_columns):
     dup_col_letter = gspread.utils.rowcol_to_a1(1, dup_col_index)[:-1]  # extract column letter
     update_range = f"{dup_col_letter}{start_row}:{dup_col_letter}{end_row}"
     sheet.update(update_range, [[v] for v in dup_values])
+    print(f"'{sheet.title}' updated ({df[duplicate_col_name].eq('Duplicate').sum()} duplicates).")
 
     # Create color for the 'duplicate' and 'unique' column
     duplicate_rule = ConditionalFormatRule(
