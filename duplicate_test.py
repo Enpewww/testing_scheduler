@@ -42,10 +42,21 @@ def connect_to_google_sheet():
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
+    
+    # Check for GCP credentials in environment variable (for GitHub Actions)
+    gcp_creds_env = os.getenv("GCP_CREDENTIALS")
+    
+    if gcp_creds_env:
+        print("🔐 Using credentials from GitHub Secrets...")
+        creds_dict = json.loads(gcp_creds_env)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    else:
+        print("💻 Using local credentials file...")
+        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+
     client = gspread.authorize(creds)
     spreadsheet = client.open_by_url(SHEET_URL)
-    print(f"Connected to: {spreadsheet.title}")
+    print(f"✅ Connected to: {spreadsheet.title}")
     return spreadsheet
 
 # HELPER: HASH SHEET CONTENTS
