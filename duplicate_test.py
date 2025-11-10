@@ -2,7 +2,7 @@ import gspread
 import time
 import hashlib
 import pandas as pd
-from oauth2client.service_account import ServiceAccountCredentials
+from google.auth import default
 import os
 import json
 from gspread_formatting import (
@@ -40,26 +40,24 @@ SHEET_CONFIG = {
 # CONNECT TO GOOGLE SHEETS
 
 def connect_to_google_sheet():
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
     # Check for GCP credentials in environment variable (for GitHub Actions)
-    gcp_creds_env = os.getenv("GCP_CREDENTIALS")
-    
-    if gcp_creds_env:
-        print("🔐 Using credentials from GitHub Secrets...")
-        creds_dict = json.loads(gcp_creds_env)
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    else:
-        print("💻 Using local credentials file...")
-        creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+    creds, project = default()
+    print("Credentials loaded for project:", project)
 
-    client = gspread.authorize(creds)
-    spreadsheet = client.open_by_url(SHEET_URL)
-    print(f"✅ Connected to: {spreadsheet.title}")
-    return spreadsheet
+    # Define the scope
+    try:
+        creds, _ = default(scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ])
+
+        client = gspread.authorize(creds)
+        spreadsheet = client.open_by_url(SHEET_URL)
+        print(f"Connected to Google Sheet {spreadsheet.title}")
+        return spreadsheet
+    
+    except Exception as e:
+        print(f"Error has been occured as {e}")
 
 # HELPER: HASH SHEET CONTENTS
 
