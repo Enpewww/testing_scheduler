@@ -15,8 +15,6 @@ from gspread_formatting import (
 # CONFIGURATION
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1GiHAMx-K2APmNeMSq6TDgz3s8GdStWFHFYgbK9igFno/edit#gid=0"
-credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-CREDENTIALS_FILE = "credentials.json"
 DUPLICATE_COLUMN = "Duplicate Data Checker"
 
 SHEET_CONFIG = {
